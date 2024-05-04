@@ -18,7 +18,8 @@ app.get('/musicians', async (req, res, next) => {
     // Establish base query object to be built up
     let query = {
         where: {},
-        include: []
+        include: [],
+        order: []
     };
 
     // Pagination Options
@@ -27,7 +28,7 @@ app.get('/musicians', async (req, res, next) => {
     // object.
     const page = req.query.page === undefined ? 1 : parseInt(req.query.page);
     const size = req.query.size === undefined ? 5 : parseInt(req.query.size);
-    if (page >= 1 && size >= 1) {
+    if (page > 0  && size > 0) {
         query.limit = size;
         query.offset = size * (page - 1);
     }
@@ -37,14 +38,25 @@ app.get('/musicians', async (req, res, next) => {
     // ?firstName=XX&lastName=YY
     // Add keys to the WHERE clause to match the firstName param, if it exists.
     // End result: { where: { firstName: req.query.firstName } }
-
+    const firstName = req.query.firstName
+    if (firstName) {
+        query.where.firstName = {
+            [Op.like]: `%${firstName}%`
+        }
+    }   
     // Your code here
-    
+ 
     // Add keys to the WHERE clause to match the lastName param, if it exists.
     // End result: { where: { lastName: req.query.lastName } }
     
     // Your code here
-
+    const lastName = req.query.lastName
+    if (lastName) {
+        query.where.lastName = {
+            [Op.like]: `%${lastName}%`
+        }
+    }
+    
 
     // STEP 2: WHERE clauses on the associated Band model
     // ?bandName=XX
@@ -53,6 +65,24 @@ app.get('/musicians', async (req, res, next) => {
     // End result: { include: [{ model: Band, where: { name: req.query.bandName } }] }
 
     // Your code here
+    const bandName = req.query.bandName
+    if (bandName) {
+        query.include.push({
+            model: Band,
+            attributes: [],
+            where: {
+                name: {
+                    [Op.like]: `%${bandName}%`
+                }
+            }
+        })
+        const bandFields = req.query.bandFields;
+        
+        if(bandFields && Array.isArray(bandFields)) {
+            query.include[1].attributes = bandFields
+        }
+
+    }
 
 
     // STEP 3: WHERE Clauses on the associated Instrument model 
@@ -71,7 +101,23 @@ app.get('/musicians', async (req, res, next) => {
     */
 
     // Your code here
-
+    const instrumentTypes = req.query.instrumentTypes
+    if(instrumentTypes && Array.isArray(instrumentTypes)){
+        query.include.push({
+            model: Instrument,
+            attributes: [],
+            where: {
+                type: {
+                    [Op.or]: instrumentTypes.map(type => ({
+                        [Op.like]: `%${type}%`
+                    }))
+                }
+            },
+            through: {
+                attributes: []
+            }
+        })
+    }
 
     // BONUS STEP 4: Specify Musician attributes to be returned
     // ?&musicianFields[]=XX&musicianFields[]=YY
@@ -83,7 +129,10 @@ app.get('/musicians', async (req, res, next) => {
     // If any other attributes are provided, only include those values
 
     // Your code here
-
+     const musicianFields = req.query.musicianFields;
+     if(musicianFields) {
+        query.attributes = musicianFields;
+     }
 
     // BONUS STEP 5: Specify attributes to be returned
     // These additions should be included in your previously implemented
@@ -120,6 +169,17 @@ app.get('/musicians', async (req, res, next) => {
     // End result: { order: [['firstName', 'asc'], ['lastName'], ['createdAt', 'desc']] }
 
     // Your code here
+    const order = req.query.order;
+    console.log(order)
+    if(order) {
+      
+        for( let orderElement of order) {
+            let orderElementArr = orderElement.split(',');
+            query.order.push(orderElementArr);
+        }
+    } else {
+        query.order = [["lastName"],["firstName"]]
+    }
 
 
     // Perform compiled query
